@@ -1,19 +1,24 @@
 package com.example.huxiandong.network.api;
 
-import com.example.huxiandong.network.api.model.Contributor;
-import com.example.huxiandong.network.api.service.GitHubService;
+import android.os.HandlerThread;
+import android.os.Looper;
+import android.os.Process;
 
-import java.util.List;
+import com.example.huxiandong.network.api.adapter.rxjava.RxJavaEnqueueCallAdapterFactory;
+import com.example.huxiandong.network.api.model.TopMovie;
+import com.example.huxiandong.network.api.service.DoubanService;
+
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import okhttp3.Dispatcher;
 import okhttp3.OkHttpClient;
+import okhttp3.internal.Util;
+import retrofit2.Response;
 import retrofit2.Retrofit;
-import retrofit2.adapter.rxjava.RxJavaCallAdapterFactory;
 import retrofit2.converter.gson.GsonConverterFactory;
-import rx.Subscriber;
-import rx.Subscription;
-import rx.android.schedulers.AndroidSchedulers;
-import rx.schedulers.Schedulers;
+import rx.Observable;
 
 /**
  * Created by huxiandong
@@ -21,9 +26,6 @@ import rx.schedulers.Schedulers;
  */
 
 public class ApiManager {
-
-    private Retrofit mRetrofit;
-    private GitHubService mGitHubService;
 
     private static class SingletonHolder {
         private static final ApiManager INSTANCE = new ApiManager();
@@ -33,24 +35,40 @@ public class ApiManager {
         return SingletonHolder.INSTANCE;
     }
 
+    private Looper mDispatcherLooper;
+    private DoubanService mDoubanService;
+
     private ApiManager() {
+        DispatcherThread dispatcherThread = new DispatcherThread();
+        dispatcherThread.start();
+        mDispatcherLooper = dispatcherThread.getLooper();
+
+        Dispatcher dispatcher = new Dispatcher(new ThreadPoolExecutor(6, Integer.MAX_VALUE, 60, TimeUnit.SECONDS,
+                new LinkedBlockingQueue<Runnable>(), Util.threadFactory("OkHttp Dispatcher", false)));
         OkHttpClient.Builder builder = new OkHttpClient.Builder()
+                .dispatcher(dispatcher)
                 .connectTimeout(5, TimeUnit.SECONDS)
                 .readTimeout(10, TimeUnit.SECONDS)
                 .writeTimeout(5, TimeUnit.SECONDS);
-        mRetrofit = new Retrofit.Builder()
-                .baseUrl("https://api.github.com/")
+        Retrofit mRetrofit = new Retrofit.Builder()
+                .baseUrl("https://api.douban.com/v2/")
                 .client(builder.build())
                 .addConverterFactory(GsonConverterFactory.create())
-                .addCallAdapterFactory(RxJavaCallAdapterFactory.createWithScheduler(Schedulers.io()))
+                .addCallAdapterFactory(RxJavaEnqueueCallAdapterFactory.create())
                 .build();
-        mGitHubService = mRetrofit.create(GitHubService.class);
+        mDoubanService = mRetrofit.create(DoubanService.class);
     }
 
-    public Subscription repoContributors(String owner, String repo, Subscriber<List<Contributor>> subscriber) {
-        return mGitHubService.repoContributors(owner, repo)
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe(subscriber);
+    public void topMovie(int start, int count, ApiRequest<TopMovie> apiRequest) {
+        Observable<Response<TopMovie>> observable = mDoubanService.topMovie(start, count);
+        apiRequest.setObservable(observable);
+        apiRequest.subscribe(mDispatcherLooper);
+    }
+
+    private static class DispatcherThread extends HandlerThread {
+        DispatcherThread() {
+            super("dispatcher", Process.THREAD_PRIORITY_BACKGROUND);
+        }
     }
 
 }
