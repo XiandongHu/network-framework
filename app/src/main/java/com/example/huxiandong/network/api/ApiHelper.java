@@ -1,6 +1,10 @@
 package com.example.huxiandong.network.api;
 
 import com.example.huxiandong.network.api.model.TopMovie;
+import com.example.huxiandong.network.api.service.DoubanService;
+
+import retrofit2.Response;
+import rx.Observable;
 
 /**
  * Created by huxiandong
@@ -9,10 +13,13 @@ import com.example.huxiandong.network.api.model.TopMovie;
 
 public class ApiHelper {
 
-    public static ApiRequest topMovie(int start, int count, ApiRequest.Listener<TopMovie> listener) {
-        ApiRequest<TopMovie> apiRequest = new ApiRequest<>(listener);
-        ApiManager.getInstance().topMovie(start, count, apiRequest);
-        return apiRequest;
+    public static ApiRequest topMovie(final int start, final int count, ApiRequest.Listener<TopMovie> listener) {
+        return ApiManager.getInstance().enqueue(new ApiProvider<TopMovie>() {
+            @Override
+            public Observable<Response<TopMovie>> observable(DoubanService service) {
+                return service.topMovie(start, count);
+            }
+        }, listener);
     }
 
 }

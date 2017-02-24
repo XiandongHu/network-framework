@@ -42,7 +42,7 @@ public class MainActivity extends AppCompatActivity {
 
     @OnClick(R.id.button_click)
     public void onClick() {
-        mApiRequest = ApiHelper.topMovie(0, 10, new ApiRequest.Listener<TopMovie>() {
+        mApiRequest = ApiHelper.topMovie(0, 20, new ApiRequest.Listener<TopMovie>() {
             @Override
             public void onSuccess(TopMovie response) {
                 StringBuilder sb = new StringBuilder();

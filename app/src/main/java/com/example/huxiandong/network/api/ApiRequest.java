@@ -1,11 +1,10 @@
 package com.example.huxiandong.network.api;
 
-import android.os.Looper;
-
 import com.example.huxiandong.network.api.model.BaseResponse;
 
 import retrofit2.Response;
 import rx.Observable;
+import rx.Scheduler;
 import rx.Subscription;
 import rx.android.schedulers.AndroidSchedulers;
 import rx.functions.Action1;
@@ -55,7 +54,7 @@ public class ApiRequest<T extends BaseResponse> {
         return mCanceled;
     }
 
-    public synchronized void subscribe(Looper looper) {
+    public synchronized void subscribe(Scheduler scheduler) {
         if (mObservable == null) {
             throw new IllegalStateException("ApiRequest has not an observable.");
         }
@@ -63,12 +62,14 @@ public class ApiRequest<T extends BaseResponse> {
             return;
         }
 
-        mSubscription = mObservable.observeOn(AndroidSchedulers.from(looper))
+        mSubscription = mObservable.observeOn(scheduler)
                 .filter(new Func1<Response<T>, Boolean>() {
                     @Override
                     public Boolean call(Response<T> response) {
-                        if (mCanceled) {
-                            return false;
+                        synchronized (ApiRequest.this) {
+                            if (mCanceled) {
+                                return false;
+                            }
                         }
                         if (response.code() == 401) {
                             // TODO: token invalid
@@ -81,8 +82,10 @@ public class ApiRequest<T extends BaseResponse> {
                 .subscribe(new Action1<Response<T>>() {
                     @Override
                     public void call(Response<T> response) {
-                        if (mCanceled) {
-                            return;
+                        synchronized (ApiRequest.this) {
+                            if (mCanceled) {
+                                return;
+                            }
                         }
 
                         if (response.isSuccessful()) {
@@ -98,8 +101,10 @@ public class ApiRequest<T extends BaseResponse> {
                 }, new Action1<Throwable>() {
                     @Override
                     public void call(Throwable throwable) {
-                        if (mCanceled) {
-                            return;
+                        synchronized (ApiRequest.this) {
+                            if (mCanceled) {
+                                return;
+                            }
                         }
 
                         if (mListener != null) {
