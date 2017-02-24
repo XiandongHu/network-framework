@@ -4,6 +4,7 @@ import android.os.HandlerThread;
 import android.os.Process;
 
 import com.example.huxiandong.network.api.adapter.rxjava.RxJavaEnqueueCallAdapterFactory;
+import com.example.huxiandong.network.api.interceptor.CustomInterceptor;
 import com.example.huxiandong.network.api.model.BaseResponse;
 import com.example.huxiandong.network.api.service.DoubanService;
 
@@ -47,6 +48,7 @@ public class ApiManager {
         Dispatcher dispatcher = new Dispatcher(new ThreadPoolExecutor(6, Integer.MAX_VALUE, 60, TimeUnit.SECONDS,
                 new LinkedBlockingQueue<Runnable>(), Util.threadFactory("OkHttp Dispatcher", false)));
         OkHttpClient.Builder builder = new OkHttpClient.Builder()
+                .addNetworkInterceptor(new CustomInterceptor())
                 .dispatcher(dispatcher)
                 .connectTimeout(5, TimeUnit.SECONDS)
                 .readTimeout(10, TimeUnit.SECONDS)
