@@ -13,7 +13,7 @@ import okhttp3.Response;
  * on 17-2-24.
  */
 
-public class CustomInterceptor implements Interceptor {
+public class ParamsInterceptor implements Interceptor {
 
     @Override
     public Response intercept(Chain chain) throws IOException {
