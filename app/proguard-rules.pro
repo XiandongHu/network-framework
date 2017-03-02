@@ -78,6 +78,8 @@
 -dontnote retrofit2.Platform
 # Platform used when running on Java 8 VMs. Will not be used at runtime.
 -dontwarn retrofit2.Platform$Java8
+-dontnote retrofit2.Platform$IOS
+-dontnote retrofit2.Platform$IOS$MainThreadExecutor
 # Retain generic type information for use by reflection by converters and adapters.
 -keepattributes Signature
 # Retain declared checked exceptions for use by a Proxy instance.
@@ -85,7 +87,7 @@
 ##---------------End: proguard configuration for Retrofit2  ----------
 
 ##---------------Begin: proguard configuration for okhttp3 & okio  ----------
--dontwarn okhttp3.**
+-dontnote okhttp3.**
 -dontwarn okio.**
 ##---------------End: proguard configuration for okhttp3 & okio  ----------
 
@@ -97,6 +99,8 @@
 -keepattributes *Annotation*
 
 # Gson specific classes
+-dontnote sun.misc.Unsafe
+-dontwarn sun.misc.Unsafe
 -keep class sun.misc.Unsafe { *; }
 #-keep class com.google.gson.stream.** { *; }
 
