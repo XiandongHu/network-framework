@@ -1,6 +1,10 @@
 package com.example.huxiandong.network.api;
 
+import android.annotation.SuppressLint;
+import android.content.Context;
+import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.Looper;
 import android.os.Process;
 
 import com.example.huxiandong.network.api.adapter.rxjava.RxJavaEnqueueCallAdapterFactory;
@@ -33,23 +37,40 @@ import rx.android.schedulers.AndroidSchedulers;
 
 public class ApiManager {
 
-    private static class SingletonHolder {
-        private static final ApiManager INSTANCE = new ApiManager();
+    @SuppressLint("StaticFieldLeak")
+    private static ApiManager sInstance;
+
+    public static void init(Context context, ApiLogger apiLogger) {
+        if (sInstance != null) {
+            throw new IllegalStateException("ApiManager has already been initialized.");
+        }
+        if (apiLogger == null) {
+            apiLogger = new AndroidLogger("ApiManager");
+        }
+        sInstance = new ApiManager(context, apiLogger);
     }
 
-    public static ApiManager getInstance() {
-        return SingletonHolder.INSTANCE;
+    static ApiManager getInstance() {
+        if (sInstance == null) {
+            throw new IllegalStateException("ApiManager has not been initialized.");
+        }
+        return sInstance;
     }
 
+    private Context mContext;
     private Scheduler mDispatcherScheduler;
     private DoubanService mDoubanService;
 
-    private ApiLogger mApiLogger = new AndroidLogger("ApiManager");
+    private ApiLogger mApiLogger;
 
-    private ApiManager() {
+    private ApiManager(Context context, ApiLogger apiLogger) {
+        mContext = context;
+        mApiLogger = apiLogger;
+
         DispatcherThread dispatcherThread = new DispatcherThread();
         dispatcherThread.start();
-        mDispatcherScheduler = AndroidSchedulers.from(dispatcherThread.getLooper());
+        Looper looper = dispatcherThread.getLooper();
+        mDispatcherScheduler = AndroidSchedulers.from(looper);
 
         Dispatcher dispatcher = new Dispatcher(new ThreadPoolExecutor(6, Integer.MAX_VALUE, 60, TimeUnit.SECONDS,
                 new LinkedBlockingQueue<Runnable>(), Util.threadFactory("OkHttp Dispatcher", false)));
@@ -60,21 +81,18 @@ public class ApiManager {
                 .writeTimeout(5, TimeUnit.SECONDS)
                 .addInterceptor(new ParamsInterceptor())
                 .addNetworkInterceptor(new LoggingInterceptor(mApiLogger))
-                .addNetworkInterceptor(new DecryptInterceptor());
-        Retrofit mRetrofit = new Retrofit.Builder()
+                .addNetworkInterceptor(new DecryptInterceptor())
+                .cookieJar(LoginManager.init(mContext, mDispatcherScheduler, new Handler(looper), mApiLogger));
+        Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl("https://api.douban.com/v2/")
                 .client(builder.build())
                 .addConverterFactory(GsonConverterFactory.create())
                 .addCallAdapterFactory(RxJavaEnqueueCallAdapterFactory.create())
                 .build();
-        mDoubanService = mRetrofit.create(DoubanService.class);
+        mDoubanService = retrofit.create(DoubanService.class);
     }
 
-    public void setApiLogger(ApiLogger apiLogger) {
-        mApiLogger = apiLogger;
-    }
-
-    public <T extends BaseResponse> ApiRequest<T> enqueue(final ApiProvider<T> provider, ApiRequest.Listener<T> listener) {
+    <T extends BaseResponse> ApiRequest<T> enqueue(final ApiProvider<T> provider, ApiRequest.Listener<T> listener) {
         final ApiRequest<T> apiRequest = new ApiRequest<>(listener);
         Observable.create(new Observable.OnSubscribe<Object>() {
             @Override
