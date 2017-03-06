@@ -66,7 +66,7 @@ public class LoginManager implements CookieJar {
     private final ApiLogger mApiLogger;
 
     private final MiAccountManager mAccountManager;
-    private final LoginPersistence mLoginPersistence;
+    private final AccountStore mAccountStore;
     private AccountInfo mAccountInfo;
 
     private ConcurrentHashMap<HttpUrl, Set<CacheCookie>> mCacheCookieMap = new ConcurrentHashMap<>();
@@ -79,7 +79,7 @@ public class LoginManager implements CookieJar {
         mApiLogger = apiLogger;
 
         mAccountManager = MiAccountManager.get(context);
-        mLoginPersistence = new LoginPersistence(context);
+        mAccountStore = new SharedPrefsStore(context);
         loadAccountInfo();
     }
 
@@ -88,7 +88,7 @@ public class LoginManager implements CookieJar {
             throw new IllegalStateException("Account info has been loaded.");
         }
 
-        mAccountInfo = AccountInfo.load(mAccountManager, mLoginPersistence);
+        mAccountInfo = AccountInfo.load(mAccountManager, mAccountStore);
         if (mAccountInfo.isValid()) {
             addOrUpdateCookies(ApiConstants.MICO_SID);
         }
@@ -164,8 +164,8 @@ public class LoginManager implements CookieJar {
         return mAccountInfo.isValid();
     }
 
-    LoginPersistence.Mode getLoginMode() {
-        return mLoginPersistence.getMode();
+    AccountType getAccountType() {
+        return mAccountStore.getAccountType();
     }
 
     public boolean hasSystemAccount() {
@@ -184,13 +184,13 @@ public class LoginManager implements CookieJar {
     }
 
     public Observable<LoginState> loginBySystemAccount(final Activity activity) {
-        mLoginPersistence.setMode(LoginPersistence.Mode.SYSTEM);
+        mAccountStore.setAccountType(AccountType.SYSTEM);
         mAccountManager.setUseSystem();
         return getAuthToken(activity);
     }
 
     public Observable<LoginState> loginByLocalAccount(final Activity activity) {
-        mLoginPersistence.setMode(LoginPersistence.Mode.LOCAL);
+        mAccountStore.setAccountType(AccountType.LOCAL);
         mAccountManager.setUseLocal();
         return addAccount(activity);
     }
@@ -224,7 +224,7 @@ public class LoginManager implements CookieJar {
                                 Account account = new Account(name, type);
                                 String cUserId = mAccountManager.getUserData(account, AccountInfo.C_USER_ID_KEY);
                                 String authToken = result.getString(MiAccountManager.KEY_AUTHTOKEN);
-                                mAccountInfo.updateAccountCoreInfo(mAccountManager, mLoginPersistence, account, cUserId, authToken);
+                                mAccountInfo.updateAccountCoreInfo(mAccountManager, mAccountStore, account, cUserId, authToken);
                                 addOrUpdateCookies(ApiConstants.MICO_SID);
                             } else {
                                 state = LoginState.FAILED;
@@ -278,7 +278,7 @@ public class LoginManager implements CookieJar {
                                 } else {
                                     cUserId = mAccountManager.getUserData(account, AccountInfo.C_USER_ID_KEY);
                                 }
-                                mAccountInfo.updateAccountCoreInfo(mAccountManager, mLoginPersistence, account, cUserId, authToken);
+                                mAccountInfo.updateAccountCoreInfo(mAccountManager, mAccountStore, account, cUserId, authToken);
                                 addOrUpdateCookies(sid);
                             } else {
                                 state = LoginState.FAILED;
@@ -315,7 +315,7 @@ public class LoginManager implements CookieJar {
                     @Override
                     public Boolean call(ServiceTokenResult serviceTokenResult) {
                         if (serviceTokenResult.errorCode == ServiceTokenResult.ErrorCode.ERROR_NONE) {
-                            mAccountInfo.updateServiceInfo(mAccountManager, mLoginPersistence, sid, serviceTokenResult.serviceToken, serviceTokenResult.security);
+                            mAccountInfo.updateServiceInfo(mAccountManager, mAccountStore, sid, serviceTokenResult.serviceToken, serviceTokenResult.security);
                             addOrUpdateCookies(sid);
                             return true;
                         } else {
@@ -391,11 +391,11 @@ public class LoginManager implements CookieJar {
     }
 
     private void onAccountRemoved() {
-        mAccountInfo.remove(mAccountManager, mLoginPersistence);
+        mAccountInfo.remove(mAccountManager, mAccountStore);
         synchronized (mCookieLock) {
             mCacheCookieMap.clear();
         }
-        mLoginPersistence.setMode(LoginPersistence.Mode.NONE);
+        mAccountStore.setAccountType(AccountType.NONE);
     }
 
 }

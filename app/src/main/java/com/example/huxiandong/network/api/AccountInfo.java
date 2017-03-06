@@ -6,6 +6,10 @@ import android.text.TextUtils;
 import com.xiaomi.accountsdk.account.data.ExtendedAuthToken;
 import com.xiaomi.passport.accountmanager.MiAccountManager;
 
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,7 +21,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class AccountInfo {
 
-    public static class PassportInfo {
+    public static class PassportInfo implements Serializable {
+        private static final long serialVersionUID = 4196400872621314050L;
+
         private String userId;
         private String cUserId;
         private String passToken;
@@ -57,9 +63,22 @@ public class AccountInfo {
         public String getPassToken() {
             return passToken;
         }
+
+        private void writeObject(ObjectOutputStream out) throws IOException {
+            out.writeObject(userId);
+            out.writeObject(cUserId);
+            out.writeObject(passToken);
+            out.writeObject(psecurity);
+        }
+
+        private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+            //
+        }
     }
 
-    public static class ServiceInfo {
+    public static class ServiceInfo implements Serializable {
+        private static final long serialVersionUID = -1387759219905842987L;
+
         private String sid;
         private String serviceToken;
         private String ssecurity;
@@ -73,6 +92,16 @@ public class AccountInfo {
         public String getServiceToken() {
             return serviceToken;
         }
+
+        private void writeObject(ObjectOutputStream out) throws IOException {
+            out.writeObject(sid);
+            out.writeObject(serviceToken);
+            out.writeObject(ssecurity);
+        }
+
+        private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+            //
+        }
     }
 
     static final String C_USER_ID_KEY = "encrypted_user_id";
@@ -80,7 +109,7 @@ public class AccountInfo {
     private static String[] EXTRA_SIDS = {
     };
 
-    static AccountInfo load(MiAccountManager accountManager, LoginPersistence loginPersistence) {
+    static AccountInfo load(MiAccountManager accountManager, AccountStore accountStore) {
         PassportInfo passportInfo = null;
         Map<String, ServiceInfo> serviceInfoMap = new HashMap<>(EXTRA_SIDS.length + 1);
         if (accountManager.isUseLocal()) {
@@ -101,13 +130,13 @@ public class AccountInfo {
                 }
             }
         } else {
-            if (!accountManager.canUseSystem() && loginPersistence.getMode() == LoginPersistence.Mode.SYSTEM) {
-                loginPersistence.setMode(LoginPersistence.Mode.NONE);
-                loginPersistence.resetEncodingAccount();
+            if (!accountManager.canUseSystem() && accountStore.getAccountType() == AccountType.SYSTEM) {
+                accountStore.setAccountType(AccountType.NONE);
+                accountStore.removeAccountInfo();
             } else {
-                String encodedAccount = loginPersistence.getEncodedAccount();
-                if (!TextUtils.isEmpty(encodedAccount)) {
-                    return new SerializableAccountInfo().decode(encodedAccount);
+                AccountInfo accountInfo = accountStore.loadAccountInfo();
+                if (accountInfo != null) {
+                    return accountInfo;
                 }
             }
         }
@@ -145,13 +174,13 @@ public class AccountInfo {
         }
     }
 
-    void updateAccountCoreInfo(MiAccountManager accountManager, LoginPersistence loginPersistence,
+    void updateAccountCoreInfo(MiAccountManager accountManager, AccountStore accountStore,
                                Account account, String cUserId, String authToken) {
         String password = accountManager.getPassword(account);
         updatePassportInfo(account.name, cUserId, password);
         updateServiceInfo(CORE_SID, authToken);
         if (accountManager.isUseSystem()) {
-            loginPersistence.setEncodedAccount(new SerializableAccountInfo().encode(this));
+            accountStore.saveAccountInfo(this);
         }
     }
 
@@ -176,17 +205,17 @@ public class AccountInfo {
         }
     }
 
-    void updateServiceInfo(MiAccountManager accountManager, LoginPersistence loginPersistence,
+    void updateServiceInfo(MiAccountManager accountManager, AccountStore accountStore,
                            String sid, String serviceToken, String ssecurity) {
         synchronized (mServiceLock) {
             mServiceInfoMap.put(sid, new ServiceInfo(sid, serviceToken, ssecurity));
         }
         if (accountManager.isUseSystem()) {
-            loginPersistence.setEncodedAccount(new SerializableAccountInfo().encode(this));
+            accountStore.saveAccountInfo(this);
         }
     }
 
-    void remove(MiAccountManager accountManager, LoginPersistence loginPersistence) {
+    void remove(MiAccountManager accountManager, AccountStore accountStore) {
         synchronized (mPassportLock) {
             mPassportInfo.reset();
         }
@@ -194,7 +223,7 @@ public class AccountInfo {
             mServiceInfoMap.clear();
         }
         if (accountManager.isUseSystem()) {
-            loginPersistence.resetEncodingAccount();
+            accountStore.removeAccountInfo();
         }
     }
 
