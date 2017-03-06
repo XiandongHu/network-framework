@@ -1,8 +1,18 @@
 <resources>
     <string name="app_name">Network</string>
 
-    <string name="api_test">Api Test</string>
-    <string name="login_test">Login Test</string>
+    <string name="douban_api_test">Douban Api Test</string>
+    <string name="login_start">Start Login</string>
+    <string name="mico_api_test">Mico Api Test</string>
+
+    <string name="login_account">系统已有小米帐号(%s)登录</string>
+    <string name="login_account_not_found">系统没有小米帐号登录</string>
+    <string name="login_use_system">继续用本帐号登录</string>
+    <string name="login_use_local">改用其他帐号</string>
+    <string name="logged_logout">注销登录</string>
+
+    <string name="toast_login_success">登录成功</string>
+    <string name="toast_login_failed">登录失败</string>
 
     <string name="action_experimental" translatable="false">实验性功能</string>
     <string name="hello_world" translatable="false">Hello world!</string>

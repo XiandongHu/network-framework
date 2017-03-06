@@ -11,19 +11,19 @@
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context="com.example.huxiandong.network.MainActivity">
     <Button
-        android:id="@+id/api_test"
+        android:id="@+id/douban_api_test"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:text="@string/api_test"/>
+        android:text="@string/douban_api_test"/>
     <Button
         android:id="@+id/login_test"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center_horizontal"
-        android:text="@string/login_test"/>
+        android:text="@string/login_start"/>
     <TextView
-        android:id="@+id/text_result"
+        android:id="@+id/api_result"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"/>

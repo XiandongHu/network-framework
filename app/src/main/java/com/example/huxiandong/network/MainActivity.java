@@ -4,10 +4,12 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 
 import com.example.huxiandong.network.api.ApiHelper;
 import com.example.huxiandong.network.api.ApiRequest;
+import com.example.huxiandong.network.api.LoginManager;
 import com.example.huxiandong.network.api.model.TopMovie;
 
 import butterknife.BindView;
@@ -16,8 +18,10 @@ import butterknife.OnClick;
 
 public class MainActivity extends AppCompatActivity {
 
-    @BindView(R.id.text_result)
-    TextView mText;
+    @BindView(R.id.login_test)
+    Button mLoginTest;
+    @BindView(R.id.api_result)
+    TextView mApiResult;
 
     private ApiRequest mApiRequest;
 
@@ -27,6 +31,12 @@ public class MainActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
+
+        if (LoginManager.getInstance().hasValidAccount()) {
+            mLoginTest.setText(R.string.mico_api_test);
+        } else {
+            mLoginTest.setText(R.string.login_start);
+        }
     }
 
     @Override
@@ -39,10 +49,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    @OnClick({R.id.api_test, R.id.login_test})
+    @OnClick({R.id.douban_api_test, R.id.login_test})
     public void onClick(View view) {
         switch (view.getId()) {
-            case R.id.api_test:
+            case R.id.douban_api_test:
                 mApiRequest = ApiHelper.topMovie(0, 20, new ApiRequest.Listener<TopMovie>() {
                     @Override
                     public void onSuccess(TopMovie response) {
@@ -53,7 +63,7 @@ public class MainActivity extends AppCompatActivity {
                             sb.append("     ");
                             sb.append(subject.title);
                         }
-                        mText.setText(sb);
+                        mApiResult.setText(sb);
                     }
 
                     @Override
@@ -62,8 +72,24 @@ public class MainActivity extends AppCompatActivity {
                 });
                 break;
             case R.id.login_test:
-                startActivity(new Intent(MainActivity.this, LoginActivity.class));
+                if (!LoginManager.getInstance().hasValidAccount()) {
+                    Intent intent = new Intent(MainActivity.this, LoginActivity.class);
+                    startActivityForResult(intent, 1000);
+                } else {
+                    // TODO: test mico api
+                }
                 break;
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == 1000) {
+            if (resultCode == RESULT_OK) {
+                mLoginTest.setText(R.string.mico_api_test);
+            }
+        } else {
+            super.onActivityResult(requestCode, resultCode, data);
         }
     }
 

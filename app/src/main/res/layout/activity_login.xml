@@ -3,68 +3,29 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:paddingBottom="@dimen/activity_vertical_margin"
-    android:paddingLeft="@dimen/activity_horizontal_margin"
-    android:paddingRight="@dimen/activity_horizontal_margin"
-    android:paddingTop="@dimen/activity_vertical_margin">
+    android:layout_marginLeft="@dimen/passport_content_horizontal_margin"
+    android:layout_marginRight="@dimen/passport_content_horizontal_margin"
+    android:layout_marginTop="20dp"
+    android:orientation="vertical">
     <TextView
-        android:id="@+id/account_id"
+        android:id="@+id/text_status"
+        style="@style/Passport.TextPrimaryWelcome"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"/>
+        android:gravity="center_horizontal"
+        android:text="@string/login_account"/>
     <Button
-        android:id="@+id/login_system_btn"
-        android:layout_width="wrap_content"
+        android:id="@+id/button_system_login"
+        style="@style/Passport.BlueButton"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/loginSystem"
-        android:visibility="gone"/>
+        android:layout_marginTop="30dp"
+        android:text="@string/login_use_system"/>
     <Button
-        android:id="@+id/login_local_btn"
-        android:layout_width="wrap_content"
+        android:id="@+id/button_local_login"
+        style="@style/Passport.ButtonNormal"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/loginLocal"
-        android:visibility="gone"/>
-    <Button
-        android:id="@+id/confirm_btn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/confirm"/>
-    <Button
-        android:id="@+id/authToken"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/authToken"/>
-    <Button
-        android:id="@+id/serviceToken"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/serviceToken"/>
-    <Button
-        android:id="@+id/stsUrl"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/sts_url"/>
-    <Button
-        android:id="@+id/cUserId"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/cUserId"
-        android:visibility="gone"/>
-    <Button
-        android:id="@+id/getCoreInfo"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/core_info"
-        android:visibility="gone"/>
-    <Button
-        android:id="@+id/remove_btn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/remove"/>
-    <Button
-        android:id="@+id/scan_barcode"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/scan_barcode"/>
+        android:layout_marginTop="10dp"
+        android:text="@string/login_use_local"/>
 </LinearLayout>

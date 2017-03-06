@@ -13,6 +13,7 @@ import android.os.Handler;
 import android.text.TextUtils;
 
 import com.example.huxiandong.network.api.logger.ApiLogger;
+import com.xiaomi.accountsdk.account.data.ExtendedAuthToken;
 import com.xiaomi.passport.accountmanager.MiAccountManager;
 import com.xiaomi.passport.servicetoken.ServiceTokenResult;
 
@@ -65,7 +66,7 @@ public class LoginManager implements CookieJar {
     private final ApiLogger mApiLogger;
 
     private final MiAccountManager mAccountManager;
-    private final LoginSettings mLoginSettings;
+    private final LoginPersistence mLoginPersistence;
     private AccountInfo mAccountInfo;
 
     private ConcurrentHashMap<HttpUrl, Set<CacheCookie>> mCacheCookieMap = new ConcurrentHashMap<>();
@@ -78,7 +79,7 @@ public class LoginManager implements CookieJar {
         mApiLogger = apiLogger;
 
         mAccountManager = MiAccountManager.get(context);
-        mLoginSettings = new LoginSettings(context);
+        mLoginPersistence = new LoginPersistence(context);
         loadAccountInfo();
     }
 
@@ -87,7 +88,7 @@ public class LoginManager implements CookieJar {
             throw new IllegalStateException("Account info has been loaded.");
         }
 
-        mAccountInfo = AccountInfo.load(mAccountManager);
+        mAccountInfo = AccountInfo.load(mAccountManager, mLoginPersistence);
         if (mAccountInfo.isValid()) {
             addOrUpdateCookies(ApiConstants.MICO_SID);
         }
@@ -159,18 +160,37 @@ public class LoginManager implements CookieJar {
         return mAccountInfo.getServiceInfo(sid);
     }
 
-    LoginSettings.Mode getLoginMode() {
-        return mLoginSettings.getMode();
+    public boolean hasValidAccount() {
+        return mAccountInfo.isValid();
+    }
+
+    LoginPersistence.Mode getLoginMode() {
+        return mLoginPersistence.getMode();
+    }
+
+    public boolean hasSystemAccount() {
+        return mAccountManager.canUseSystem();
+    }
+
+    public String getSystemAccountUserId() {
+        if (hasSystemAccount()) {
+            mAccountManager.setUseSystem();
+            Account account = mAccountManager.getXiaomiAccount();
+            if (account != null) {
+                return account.name;
+            }
+        }
+        return null;
     }
 
     public Observable<LoginState> loginBySystemAccount(final Activity activity) {
-        mLoginSettings.setMode(LoginSettings.Mode.SYSTEM);
+        mLoginPersistence.setMode(LoginPersistence.Mode.SYSTEM);
         mAccountManager.setUseSystem();
         return getAuthToken(activity);
     }
 
     public Observable<LoginState> loginByLocalAccount(final Activity activity) {
-        mLoginSettings.setMode(LoginSettings.Mode.LOCAL);
+        mLoginPersistence.setMode(LoginPersistence.Mode.LOCAL);
         mAccountManager.setUseLocal();
         return addAccount(activity);
     }
@@ -196,10 +216,16 @@ public class LoginManager implements CookieJar {
 
                         LoginState state;
                         try {
-                            Bundle bundle = future.getResult();
-                            if (bundle.getBoolean(MiAccountManager.KEY_BOOLEAN_RESULT)) {
+                            Bundle result = future.getResult();
+                            if (result.getBoolean(MiAccountManager.KEY_BOOLEAN_RESULT)) {
                                 state = LoginState.SUCCESS;
-                                // TODO: update account info and cookies
+                                String name = result.getString(MiAccountManager.KEY_ACCOUNT_NAME);
+                                String type = result.getString(MiAccountManager.KEY_ACCOUNT_TYPE);
+                                Account account = new Account(name, type);
+                                String cUserId = mAccountManager.getUserData(account, AccountInfo.C_USER_ID_KEY);
+                                String authToken = result.getString(MiAccountManager.KEY_AUTHTOKEN);
+                                mAccountInfo.updateAccountCoreInfo(mAccountManager, mLoginPersistence, account, cUserId, authToken);
+                                addOrUpdateCookies(ApiConstants.MICO_SID);
                             } else {
                                 state = LoginState.FAILED;
                                 mApiLogger.w("Add account failed or canceled.");
@@ -224,7 +250,7 @@ public class LoginManager implements CookieJar {
         return Observable.create(new Observable.OnSubscribe<LoginState>() {
             @Override
             public void call(final Subscriber<? super LoginState> subscriber) {
-                Account account = mAccountManager.getXiaomiAccount();
+                final Account account = mAccountManager.getXiaomiAccount();
                 if (account == null) {
                     subscriber.onNext(LoginState.NO_ACCOUNT);
                     subscriber.onCompleted();
@@ -242,11 +268,18 @@ public class LoginManager implements CookieJar {
 
                         LoginState state;
                         try {
-                            Bundle bundle = accountManagerFuture.getResult();
-                            String authToken = bundle.getString(MiAccountManager.KEY_AUTHTOKEN);
+                            Bundle result = accountManagerFuture.getResult();
+                            String authToken = result.getString(MiAccountManager.KEY_AUTHTOKEN);
                             if (!TextUtils.isEmpty(authToken)) {
                                 state = LoginState.SUCCESS;
-                                // TODO: update account info and cookies
+                                String cUserId;
+                                if (mAccountManager.isUseSystem()) {
+                                    cUserId = result.getString(AccountInfo.C_USER_ID_KEY);
+                                } else {
+                                    cUserId = mAccountManager.getUserData(account, AccountInfo.C_USER_ID_KEY);
+                                }
+                                mAccountInfo.updateAccountCoreInfo(mAccountManager, mLoginPersistence, account, cUserId, authToken);
+                                addOrUpdateCookies(sid);
                             } else {
                                 state = LoginState.FAILED;
                                 mApiLogger.w("Get auth token account failed.");
@@ -282,7 +315,7 @@ public class LoginManager implements CookieJar {
                     @Override
                     public Boolean call(ServiceTokenResult serviceTokenResult) {
                         if (serviceTokenResult.errorCode == ServiceTokenResult.ErrorCode.ERROR_NONE) {
-                            mAccountInfo.updateServiceInfo(sid, serviceTokenResult.serviceToken, serviceTokenResult.security);
+                            mAccountInfo.updateServiceInfo(mAccountManager, mLoginPersistence, sid, serviceTokenResult.serviceToken, serviceTokenResult.security);
                             addOrUpdateCookies(sid);
                             return true;
                         } else {
@@ -294,12 +327,22 @@ public class LoginManager implements CookieJar {
     }
 
     private void invalidateAuthToken(String sid) {
-        Account account = mAccountManager.getXiaomiAccount();
-        if (account != null) {
-            String authToken = mAccountManager.peekAuthToken(account, sid);
-            if (!TextUtils.isEmpty(authToken)) {
-                mAccountManager.invalidateAuthToken(sid, authToken);
+        if (!mAccountInfo.isValid()) {
+            return;
+        }
+
+        if (mAccountManager.isUseLocal()) {
+            Account account = mAccountManager.getXiaomiAccount();
+            if (account != null) {
+                String authToken = mAccountManager.peekAuthToken(account, sid);
+                if (!TextUtils.isEmpty(authToken)) {
+                    mAccountManager.invalidateAuthToken(sid, authToken);
+                }
             }
+        } else {
+            AccountInfo.ServiceInfo serviceInfo = mAccountInfo.getServiceInfo(sid);
+            ExtendedAuthToken extendedAuthToken = ExtendedAuthToken.build(serviceInfo.getServiceToken(), serviceInfo.getServiceToken());
+            mAccountManager.invalidateAuthToken(sid, extendedAuthToken.toPlain());
         }
     }
 
@@ -324,8 +367,13 @@ public class LoginManager implements CookieJar {
 
                             LoginState state;
                             try {
-                                Boolean success = future.getResult();
-                                state = success ? LoginState.SUCCESS : LoginState.FAILED;
+                                Boolean result = future.getResult();
+                                if (result) {
+                                    onAccountRemoved();
+                                    state = LoginState.SUCCESS;
+                                } else {
+                                    state = LoginState.FAILED;
+                                }
                             } catch (OperationCanceledException | AuthenticatorException | IOException e) {
                                 state = LoginState.FAILED;
                             }
@@ -334,6 +382,7 @@ public class LoginManager implements CookieJar {
                         }
                     }, mHandler);
                 } else {
+                    onAccountRemoved();
                     subscriber.onNext(LoginState.SUCCESS);
                     subscriber.onCompleted();
                 }
@@ -342,11 +391,11 @@ public class LoginManager implements CookieJar {
     }
 
     private void onAccountRemoved() {
-        mAccountInfo.remove();
+        mAccountInfo.remove(mAccountManager, mLoginPersistence);
         synchronized (mCookieLock) {
             mCacheCookieMap.clear();
         }
-        mLoginSettings.setMode(LoginSettings.Mode.NONE);
+        mLoginPersistence.setMode(LoginPersistence.Mode.NONE);
     }
 
 }

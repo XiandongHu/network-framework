@@ -75,26 +75,39 @@ public class AccountInfo {
         }
     }
 
-    private static String MICO_SID = ApiConstants.MICO_SID;
+    static final String C_USER_ID_KEY = "encrypted_user_id";
+    private static String CORE_SID = ApiConstants.MICO_SID;
     private static String[] EXTRA_SIDS = {
     };
 
-    static AccountInfo load(MiAccountManager accountManager) {
+    static AccountInfo load(MiAccountManager accountManager, LoginPersistence loginPersistence) {
         PassportInfo passportInfo = null;
         Map<String, ServiceInfo> serviceInfoMap = new HashMap<>(EXTRA_SIDS.length + 1);
-        Account account = accountManager.getXiaomiAccount();
-        if (account != null) {
-            String cUserId = accountManager.getUserData(account, "encrypted_user_id");
-            ExtendedAuthToken extPass = ExtendedAuthToken.parse(accountManager.getPassword(account));
-            ExtendedAuthToken extService = ExtendedAuthToken.parse(accountManager.peekAuthToken(account, MICO_SID));
-            if (extPass != null && extService != null) {
-                passportInfo = new PassportInfo(account.name, cUserId, extPass.authToken, extPass.security);
-                serviceInfoMap.put(MICO_SID, new ServiceInfo(MICO_SID, extService.authToken, extService.security));
-                for (String extra_sid : EXTRA_SIDS) {
-                    extService = ExtendedAuthToken.parse(accountManager.peekAuthToken(account, extra_sid));
-                    if (extService != null) {
-                        serviceInfoMap.put(extra_sid, new ServiceInfo(extra_sid, extService.authToken, extService.security));
+        if (accountManager.isUseLocal()) {
+            Account account = accountManager.getXiaomiAccount();
+            if (account != null) {
+                String cUserId = accountManager.getUserData(account, C_USER_ID_KEY);
+                ExtendedAuthToken extPass = ExtendedAuthToken.parse(accountManager.getPassword(account));
+                ExtendedAuthToken extService = ExtendedAuthToken.parse(accountManager.peekAuthToken(account, CORE_SID));
+                if (extPass != null && extService != null) {
+                    passportInfo = new PassportInfo(account.name, cUserId, extPass.authToken, extPass.security);
+                    serviceInfoMap.put(CORE_SID, new ServiceInfo(CORE_SID, extService.authToken, extService.security));
+                    for (String extra_sid : EXTRA_SIDS) {
+                        extService = ExtendedAuthToken.parse(accountManager.peekAuthToken(account, extra_sid));
+                        if (extService != null) {
+                            serviceInfoMap.put(extra_sid, new ServiceInfo(extra_sid, extService.authToken, extService.security));
+                        }
                     }
+                }
+            }
+        } else {
+            if (!accountManager.canUseSystem() && loginPersistence.getMode() == LoginPersistence.Mode.SYSTEM) {
+                loginPersistence.setMode(LoginPersistence.Mode.NONE);
+                loginPersistence.resetEncodingAccount();
+            } else {
+                String encodedAccount = loginPersistence.getEncodedAccount();
+                if (!TextUtils.isEmpty(encodedAccount)) {
+                    return new SerializableAccountInfo().decode(encodedAccount);
                 }
             }
         }
@@ -117,7 +130,7 @@ public class AccountInfo {
     }
 
     synchronized boolean isValid() {
-        return mPassportInfo.isValid() && mServiceInfoMap.containsKey(MICO_SID);
+        return mPassportInfo.isValid() && mServiceInfoMap.containsKey(CORE_SID);
     }
 
     PassportInfo getPassportInfo() {
@@ -132,19 +145,29 @@ public class AccountInfo {
         }
     }
 
-    void updatePassportInfo(String userId, String cUserId, String authToken) {
-        mPassportInfo.userId = userId;
-        mPassportInfo.cUserId = cUserId;
+    void updateAccountCoreInfo(MiAccountManager accountManager, LoginPersistence loginPersistence,
+                               Account account, String cUserId, String authToken) {
+        String password = accountManager.getPassword(account);
+        updatePassportInfo(account.name, cUserId, password);
+        updateServiceInfo(CORE_SID, authToken);
+        if (accountManager.isUseSystem()) {
+            loginPersistence.setEncodedAccount(new SerializableAccountInfo().encode(this));
+        }
+    }
+
+    private void updatePassportInfo(String userId, String cUserId, String authToken) {
         ExtendedAuthToken extPass = ExtendedAuthToken.parse(authToken);
         if (extPass != null) {
             synchronized (mPassportLock) {
+                mPassportInfo.userId = userId;
+                mPassportInfo.cUserId = cUserId;
                 mPassportInfo.passToken = extPass.authToken;
                 mPassportInfo.psecurity = extPass.security;
             }
         }
     }
 
-    void updateServiceInfo(String sid, String authToken) {
+    private void updateServiceInfo(String sid, String authToken) {
         ExtendedAuthToken exService = ExtendedAuthToken.parse(authToken);
         if (exService != null) {
             synchronized (mServiceLock) {
@@ -153,18 +176,25 @@ public class AccountInfo {
         }
     }
 
-    void updateServiceInfo(String sid, String serviceToken, String ssecurity) {
+    void updateServiceInfo(MiAccountManager accountManager, LoginPersistence loginPersistence,
+                           String sid, String serviceToken, String ssecurity) {
         synchronized (mServiceLock) {
             mServiceInfoMap.put(sid, new ServiceInfo(sid, serviceToken, ssecurity));
         }
+        if (accountManager.isUseSystem()) {
+            loginPersistence.setEncodedAccount(new SerializableAccountInfo().encode(this));
+        }
     }
 
-    void remove() {
+    void remove(MiAccountManager accountManager, LoginPersistence loginPersistence) {
         synchronized (mPassportLock) {
             mPassportInfo.reset();
         }
         synchronized (mServiceLock) {
             mServiceInfoMap.clear();
+        }
+        if (accountManager.isUseSystem()) {
+            loginPersistence.resetEncodingAccount();
         }
     }
 
