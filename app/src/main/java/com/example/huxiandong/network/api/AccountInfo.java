@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -33,18 +32,6 @@ public class AccountInfo {
             reset();
         }
 
-        private PassportInfo(String userId, String cUserId, String passToken, String psecurity) {
-            this.userId = userId;
-            this.cUserId = cUserId;
-            this.passToken = passToken;
-            this.psecurity = psecurity;
-        }
-
-        private boolean isValid() {
-            return !TextUtils.isEmpty(userId) && !TextUtils.isEmpty(cUserId)
-                    && !TextUtils.isEmpty(passToken) && !TextUtils.isEmpty(psecurity);
-        }
-
         private void reset() {
             this.userId = "";
             this.cUserId = "";
@@ -62,6 +49,10 @@ public class AccountInfo {
 
         public String getPassToken() {
             return passToken;
+        }
+
+        private boolean isValid() {
+            return !TextUtils.isEmpty(userId) && !TextUtils.isEmpty(cUserId);
         }
 
         private void writeObject(ObjectOutputStream out) throws IOException {
@@ -109,61 +100,43 @@ public class AccountInfo {
         }
     }
 
-    static final String C_USER_ID_KEY = "encrypted_user_id";
     private static String CORE_SID = ApiConstants.MICO_SID;
-    private static String[] EXTRA_SIDS = {
-    };
 
     static AccountInfo load(MiAccountManager accountManager, AccountStore accountStore) {
-        PassportInfo passportInfo = null;
-        Map<String, ServiceInfo> serviceInfoMap = new HashMap<>(EXTRA_SIDS.length + 1);
-        if (accountManager.isUseLocal()) {
-            Account account = accountManager.getXiaomiAccount();
-            if (account != null) {
-                String cUserId = accountManager.getUserData(account, C_USER_ID_KEY);
-                ExtendedAuthToken extPass = ExtendedAuthToken.parse(accountManager.getPassword(account));
-                ExtendedAuthToken extService = ExtendedAuthToken.parse(accountManager.peekAuthToken(account, CORE_SID));
-                if (extPass != null && extService != null) {
-                    passportInfo = new PassportInfo(account.name, cUserId, extPass.authToken, extPass.security);
-                    serviceInfoMap.put(CORE_SID, new ServiceInfo(CORE_SID, extService.authToken, extService.security));
-                    for (String extra_sid : EXTRA_SIDS) {
-                        extService = ExtendedAuthToken.parse(accountManager.peekAuthToken(account, extra_sid));
-                        if (extService != null) {
-                            serviceInfoMap.put(extra_sid, new ServiceInfo(extra_sid, extService.authToken, extService.security));
-                        }
-                    }
-                }
-            }
-        } else {
-            if (!accountManager.canUseSystem() && accountStore.getAccountType() == AccountType.SYSTEM) {
+        AccountInfo accountInfo = null;
+        if (accountManager.getXiaomiAccount() == null) {
+            AccountType accountType = accountStore.getAccountType();
+            if (accountType != AccountType.UNKNOWN && accountType != AccountType.NONE) {
                 accountStore.setAccountType(AccountType.NONE);
-                accountStore.removeAccountInfo();
-            } else {
-                AccountInfo accountInfo = accountStore.loadAccountInfo();
-                if (accountInfo != null) {
-                    return accountInfo;
-                }
             }
+            accountStore.removeAccountInfo();
+        } else {
+            accountInfo = accountStore.loadAccountInfo();
         }
-        if (passportInfo == null) {
-            passportInfo = new PassportInfo();
+        if (accountInfo == null) {
+            accountInfo = new AccountInfo();
         }
 
-        return newAccountInfo(passportInfo, serviceInfoMap);
+        return accountInfo;
     }
 
     static AccountInfo newAccountInfo(PassportInfo passportInfo, Map<String, ServiceInfo> serviceInfoMap) {
         return new AccountInfo(passportInfo, serviceInfoMap);
     }
 
-    private PassportInfo mPassportInfo;
+    private PassportInfo mPassportInfo = new PassportInfo();
     private Map<String, ServiceInfo> mServiceInfoMap = new ConcurrentHashMap<>();
 
     private final Object mPassportLock = new Object();
 
+    private AccountInfo() {
+    }
+
     private AccountInfo(PassportInfo passportInfo, Map<String, ServiceInfo> serviceInfoMap) {
         mPassportInfo = passportInfo;
-        mServiceInfoMap.putAll(serviceInfoMap);
+        if (serviceInfoMap != null && !serviceInfoMap.isEmpty()) {
+            mServiceInfoMap.putAll(serviceInfoMap);
+        }
     }
 
     PassportInfo getPassportInfo() {
@@ -186,49 +159,55 @@ public class AccountInfo {
 
     void updateAccountCoreInfo(MiAccountManager accountManager, AccountStore accountStore,
                                Account account, String cUserId, String authToken) {
-        String password = accountManager.getPassword(account);
+        String password;
+        try {
+            password = accountManager.getPassword(account);
+        } catch (SecurityException e) {
+            password = null;
+        }
         updatePassportInfo(account.name, cUserId, password);
         updateServiceInfo(CORE_SID, authToken);
+
         if (accountManager.isUseSystem()) {
-            accountStore.saveAccountInfo(this);
+            accountStore.setAccountType(AccountType.SYSTEM);
+        } else {
+            accountStore.setAccountType(AccountType.LOCAL);
         }
+        accountStore.saveAccountInfo(this);
     }
 
     private void updatePassportInfo(String userId, String cUserId, String authToken) {
-        ExtendedAuthToken extPass = ExtendedAuthToken.parse(authToken);
-        if (extPass != null) {
-            synchronized (mPassportLock) {
-                mPassportInfo.userId = userId;
-                mPassportInfo.cUserId = cUserId;
-                mPassportInfo.passToken = extPass.authToken;
-                mPassportInfo.psecurity = extPass.security;
+        synchronized (mPassportLock) {
+            mPassportInfo.userId = userId;
+            mPassportInfo.cUserId = cUserId;
+            ExtendedAuthToken extendedAuthToken = ExtendedAuthToken.parse(authToken);
+            if (extendedAuthToken != null) {
+                mPassportInfo.passToken = extendedAuthToken.authToken;
+                mPassportInfo.psecurity = extendedAuthToken.security;
             }
         }
     }
 
     private void updateServiceInfo(String sid, String authToken) {
-        ExtendedAuthToken exService = ExtendedAuthToken.parse(authToken);
-        if (exService != null) {
-            mServiceInfoMap.put(sid, new ServiceInfo(sid, exService.authToken, exService.security));
+        ExtendedAuthToken extendedAuthToken = ExtendedAuthToken.parse(authToken);
+        if (extendedAuthToken != null) {
+            mServiceInfoMap.put(sid, new ServiceInfo(sid, extendedAuthToken.authToken, extendedAuthToken.security));
         }
     }
 
-    void updateServiceInfo(MiAccountManager accountManager, AccountStore accountStore,
-                           String sid, String serviceToken, String ssecurity) {
+    void updateServiceInfo(AccountStore accountStore, String sid, String serviceToken, String ssecurity) {
         mServiceInfoMap.put(sid, new ServiceInfo(sid, serviceToken, ssecurity));
-        if (accountManager.isUseSystem()) {
-            accountStore.saveAccountInfo(this);
-        }
+        accountStore.saveAccountInfo(this);
     }
 
-    void remove(MiAccountManager accountManager, AccountStore accountStore) {
+    void remove(AccountStore accountStore) {
         synchronized (mPassportLock) {
             mPassportInfo.reset();
         }
         mServiceInfoMap.clear();
-        if (accountManager.isUseSystem()) {
-            accountStore.removeAccountInfo();
-        }
+
+        accountStore.setAccountType(AccountType.NONE);
+        accountStore.removeAccountInfo();
     }
 
 }

@@ -3,7 +3,7 @@
 
     <string name="douban_api_test">Douban Api Test</string>
     <string name="login_start">Start Login</string>
-    <string name="mico_api_test">Mico Api Test</string>
+    <string name="logout">Logout</string>
 
     <string name="login_account">系统已有小米帐号(%s)登录</string>
     <string name="login_account_not_found">系统没有小米帐号登录</string>
