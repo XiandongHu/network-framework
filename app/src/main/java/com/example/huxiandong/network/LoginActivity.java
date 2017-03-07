@@ -61,6 +61,11 @@ public class LoginActivity extends AppCompatActivity {
 
     private void checkSystemDangerousPermission() {
         new RuntimePermissionHelper.Builder()
+                .runnableIfDenied(new Runnable() {
+                    @Override
+                    public void run() {
+                    }
+                })
                 .runnableIfGranted(new Runnable() {
                     @Override
                     public void run() {

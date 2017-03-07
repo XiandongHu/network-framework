@@ -341,8 +341,10 @@ public class LoginManager implements CookieJar {
             }
         } else {
             AccountInfo.ServiceInfo serviceInfo = mAccountInfo.getServiceInfo(sid);
-            ExtendedAuthToken extendedAuthToken = ExtendedAuthToken.build(serviceInfo.getServiceToken(), serviceInfo.getServiceToken());
-            mAccountManager.invalidateAuthToken(sid, extendedAuthToken.toPlain());
+            if (serviceInfo != null) {
+                ExtendedAuthToken extendedAuthToken = ExtendedAuthToken.build(serviceInfo.getServiceToken(), serviceInfo.getServiceToken());
+                mAccountManager.invalidateAuthToken(sid, extendedAuthToken.toPlain());
+            }
         }
     }
 

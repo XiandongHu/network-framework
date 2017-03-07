@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.util.Map;
 
 /**
  * Created by huxiandong
@@ -65,6 +66,8 @@ class SharedPrefsStore implements AccountStore {
     }
 
     private static class SerializableAccountInfo implements Serializable {
+        private static final long serialVersionUID = -5499321915333515087L;
+
         private transient AccountInfo accountInfo;
 
         String encode(AccountInfo accountInfo) {
@@ -138,11 +141,15 @@ class SharedPrefsStore implements AccountStore {
         }
 
         private void writeObject(ObjectOutputStream out) throws IOException {
-            //
+            out.writeObject(accountInfo.getPassportInfo());
+            out.writeObject(accountInfo.getServiceInfoMap());
         }
 
+        @SuppressWarnings("unchecked")
         private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
-            //
+            AccountInfo.PassportInfo passportInfo = (AccountInfo.PassportInfo) in.readObject();
+            Map<String, AccountInfo.ServiceInfo> serviceInfoMap = (Map<String, AccountInfo.ServiceInfo>) in.readObject();
+            accountInfo = AccountInfo.newAccountInfo(passportInfo, serviceInfoMap);
         }
 
     }

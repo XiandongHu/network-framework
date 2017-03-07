@@ -9,33 +9,10 @@
     <string name="login_account_not_found">系统没有小米帐号登录</string>
     <string name="login_use_system">继续用本帐号登录</string>
     <string name="login_use_local">改用其他帐号</string>
-    <string name="logged_logout">注销登录</string>
 
     <string name="toast_login_success">登录成功</string>
     <string name="toast_login_failed">登录失败</string>
 
-    <string name="action_experimental" translatable="false">实验性功能</string>
-    <string name="hello_world" translatable="false">Hello world!</string>
-    <string name="loginLocal" translatable="false">本地帐号登陆</string>
-    <string name="loginSystem" translatable="false">系统帐号登陆</string>
-    <string name="confirm" translatable="false">密码验证</string>
-    <string name="remove" translatable="false">退出帐号</string>
-    <string name="mi_account_name" translatable="false">Mi Account</string>
-    <string name="authToken" translatable="false">获取AuthToken</string>
-    <string name="serviceToken" translatable="false">获取serviceToken</string>
-    <string name="sts_url" translatable="false">获取StsUrl</string>
-    <string name="core_info" translatable="false">获取用户信息</string>
     <string name="get_account_dialog_title" translatable="false">申请GET_ACCOUNT权限</string>
     <string name="get_account_dialog_message" translatable="false">申请GET_ACCOUNT权限，用于获取系统小米帐号</string>
-    <string name="cUserId">获取cUserId</string>
-    <string name="change_account">切换账号</string>
-    <string name="system_account">系统帐号: %s</string>
-    <string name="local_account">本地帐号: %s</string>
-
-    <string name="scan_barcode">扫码登录</string>
-    <string name="scan_barcode_prompt">请扫描激活页面二维码</string>
-    <string name="gif_not_support_camera_msg">你的设备不支持摄像机功能</string>
-    <string name="open_camera_exception_dialog_title">相机故障</string>
-    <string name="open_camera_exception_dialog_content">系统相机出现问题，可能需要重启设备。</string>
-    <string name="scan_barcode_info">扫描网页或电视上的二维码，安全登录小米帐号</string>
 </resources>

@@ -72,7 +72,10 @@ public class AccountInfo {
         }
 
         private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
-            //
+            userId = (String) in.readObject();
+            cUserId = (String) in.readObject();
+            passToken = (String) in.readObject();
+            psecurity = (String) in.readObject();
         }
     }
 
@@ -100,7 +103,9 @@ public class AccountInfo {
         }
 
         private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
-            //
+            sid = (String) in.readObject();
+            serviceToken = (String) in.readObject();
+            ssecurity = (String) in.readObject();
         }
     }
 
@@ -144,22 +149,21 @@ public class AccountInfo {
             passportInfo = new PassportInfo();
         }
 
+        return newAccountInfo(passportInfo, serviceInfoMap);
+    }
+
+    static AccountInfo newAccountInfo(PassportInfo passportInfo, Map<String, ServiceInfo> serviceInfoMap) {
         return new AccountInfo(passportInfo, serviceInfoMap);
     }
 
     private PassportInfo mPassportInfo;
-    private ConcurrentHashMap<String, ServiceInfo> mServiceInfoMap = new ConcurrentHashMap<>();
+    private Map<String, ServiceInfo> mServiceInfoMap = new ConcurrentHashMap<>();
 
     private final Object mPassportLock = new Object();
-    private final Object mServiceLock = new Object();
 
     private AccountInfo(PassportInfo passportInfo, Map<String, ServiceInfo> serviceInfoMap) {
         mPassportInfo = passportInfo;
         mServiceInfoMap.putAll(serviceInfoMap);
-    }
-
-    synchronized boolean isValid() {
-        return mPassportInfo.isValid() && mServiceInfoMap.containsKey(CORE_SID);
     }
 
     PassportInfo getPassportInfo() {
@@ -168,10 +172,16 @@ public class AccountInfo {
         }
     }
 
+    Map<String, ServiceInfo> getServiceInfoMap() {
+        return mServiceInfoMap;
+    }
+
     ServiceInfo getServiceInfo(String sid) {
-        synchronized (mServiceLock) {
-            return mServiceInfoMap.get(sid);
-        }
+        return mServiceInfoMap.get(sid);
+    }
+
+    synchronized boolean isValid() {
+        return mPassportInfo.isValid() && mServiceInfoMap.containsKey(CORE_SID);
     }
 
     void updateAccountCoreInfo(MiAccountManager accountManager, AccountStore accountStore,
@@ -199,17 +209,13 @@ public class AccountInfo {
     private void updateServiceInfo(String sid, String authToken) {
         ExtendedAuthToken exService = ExtendedAuthToken.parse(authToken);
         if (exService != null) {
-            synchronized (mServiceLock) {
-                mServiceInfoMap.put(sid, new ServiceInfo(sid, exService.authToken, exService.security));
-            }
+            mServiceInfoMap.put(sid, new ServiceInfo(sid, exService.authToken, exService.security));
         }
     }
 
     void updateServiceInfo(MiAccountManager accountManager, AccountStore accountStore,
                            String sid, String serviceToken, String ssecurity) {
-        synchronized (mServiceLock) {
-            mServiceInfoMap.put(sid, new ServiceInfo(sid, serviceToken, ssecurity));
-        }
+        mServiceInfoMap.put(sid, new ServiceInfo(sid, serviceToken, ssecurity));
         if (accountManager.isUseSystem()) {
             accountStore.saveAccountInfo(this);
         }
@@ -219,9 +225,7 @@ public class AccountInfo {
         synchronized (mPassportLock) {
             mPassportInfo.reset();
         }
-        synchronized (mServiceLock) {
-            mServiceInfoMap.clear();
-        }
+        mServiceInfoMap.clear();
         if (accountManager.isUseSystem()) {
             accountStore.removeAccountInfo();
         }

@@ -8,7 +8,7 @@ import java.util.Map;
  * on 17/3/5.
  */
 
-public class ApiConstants {
+class ApiConstants {
 
     static final String MICO_BASE_URL = "https://api.mico.com/";
     static final String MICO_SID = "mico_staging";
@@ -18,6 +18,5 @@ public class ApiConstants {
             put(MICO_SID, MICO_BASE_URL);
         }
     };
-
 
 }
