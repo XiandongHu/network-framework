@@ -105,6 +105,8 @@ public class RxJavaEnqueueCallAdapterFactory extends CallAdapter.Factory {
     }
 
     private static final class RequestArbiter<T> extends AtomicBoolean implements Subscription, Producer {
+        private static final long serialVersionUID = 7982451379763135859L;
+
         private final Call<T> call;
         private final Subscriber<? super Response<T>> subscriber;
 

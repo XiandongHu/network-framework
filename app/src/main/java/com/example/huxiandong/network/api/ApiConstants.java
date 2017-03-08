@@ -10,10 +10,12 @@ import java.util.Map;
 
 class ApiConstants {
 
-    static final String MICO_BASE_URL = "https://api.mico.com/";
+    static final String MICO_BASE_URL = "https://staging.api.mina.mi.com/";
     static final String MICO_SID = "mico_staging";
 
     static final Map<String, String> sidToUrl = new HashMap<String, String>() {
+        private static final long serialVersionUID = -6215372541386342673L;
+
         {
             put(MICO_SID, MICO_BASE_URL);
         }

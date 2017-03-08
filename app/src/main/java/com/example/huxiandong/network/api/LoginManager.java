@@ -24,7 +24,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import okhttp3.Cookie;
 import okhttp3.CookieJar;
@@ -69,7 +68,7 @@ public class LoginManager implements CookieJar {
     private final AccountStore mAccountStore;
     private AccountInfo mAccountInfo;
 
-    private ConcurrentHashMap<HttpUrl, Set<CacheCookie>> mCacheCookieMap = new ConcurrentHashMap<>();
+    private Set<CacheCookie> mCacheCookies = new HashSet<>();
     private final Object mCookieLock = new Object();
 
     private LoginManager(Context context, Scheduler scheduler, Handler handler, ApiLogger apiLogger) {
@@ -102,13 +101,17 @@ public class LoginManager implements CookieJar {
                     .secure()
                     .domain(httpUrl.host())
                     .path("/");
-            Cookie userIdCookie = builder.name("cUserId")
+            Cookie userIdCookie = builder.name("userId")
+                    .value(mAccountInfo.getPassportInfo().getUserId())
+                    .build();
+            Cookie cUserIdCookie = builder.name("cUserId")
                     .value(mAccountInfo.getPassportInfo().getCUserId())
                     .build();
             Cookie serviceTokenCookie = builder.name("serviceToken")
                     .value(mAccountInfo.getServiceInfo(sid).getServiceToken())
                     .build();
             cookies.add(userIdCookie);
+            cookies.add(cUserIdCookie);
             cookies.add(serviceTokenCookie);
             saveFromResponse(httpUrl, cookies);
         }
@@ -117,13 +120,12 @@ public class LoginManager implements CookieJar {
     @Override
     public List<Cookie> loadForRequest(HttpUrl url) {
         synchronized (mCookieLock) {
-            Set<CacheCookie> cacheCookies = mCacheCookieMap.get(url);
-            if (cacheCookies == null) {
+            if (mCacheCookies == null || mCacheCookies.isEmpty()) {
                 return Collections.emptyList();
             }
 
             List<Cookie> validCookies = new ArrayList<>();
-            Iterator<CacheCookie> it = cacheCookies.iterator();
+            Iterator<CacheCookie> it = mCacheCookies.iterator();
             while (it.hasNext()) {
                 Cookie cookie = it.next().getCookie();
                 if (cookie.expiresAt() < System.currentTimeMillis()) {
@@ -140,14 +142,9 @@ public class LoginManager implements CookieJar {
     @Override
     public void saveFromResponse(HttpUrl url, List<Cookie> cookies) {
         synchronized (mCookieLock) {
-            Set<CacheCookie> cacheCookies = mCacheCookieMap.get(url);
-            if (cacheCookies == null) {
-                cacheCookies = new HashSet<>();
-                mCacheCookieMap.put(url, cacheCookies);
-            }
             for (CacheCookie cacheCookie : CacheCookie.decorateCookies(cookies)) {
-                cacheCookies.remove(cacheCookie);
-                cacheCookies.add(cacheCookie);
+                mCacheCookies.remove(cacheCookie);
+                mCacheCookies.add(cacheCookie);
             }
         }
     }
@@ -359,7 +356,7 @@ public class LoginManager implements CookieJar {
     private void onAccountRemoved() {
         mAccountInfo.remove(mAccountStore);
         synchronized (mCookieLock) {
-            mCacheCookieMap.clear();
+            mCacheCookies.clear();
         }
     }
 
