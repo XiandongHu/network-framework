@@ -6,6 +6,45 @@
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
+
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowBackground">@color/white</item>
+        <item name="android:colorForeground">@color/passport_bright_foreground_light</item>
+        <item name="android:colorForegroundInverse">@color/passport_bright_foreground_light_inverse</item>
+        <item name="android:colorBackground">@color/passport_background_light</item>
+        <item name="android:colorBackgroundCacheHint">?android:attr/colorBackground</item>
+
+        <item name="android:colorPressedHighlight">@color/passport_highlighted_text_light</item>
+        <item name="android:colorLongPressedHighlight">@color/passport_highlighted_text_light</item>
+        <item name="android:colorFocusedHighlight">@color/passport_highlighted_text_light</item>
+        <item name="android:colorMultiSelectHighlight">@color/passport_highlighted_text_light</item>
+        <item name="android:colorActivatedHighlight">@color/passport_highlighted_text_light</item>
+
+        <item name="android:textAppearance">@style/Passport.TextAppearance</item>
+        <item name="android:textAppearanceInverse">@style/Passport.TextAppearance.Inverse</item>
+
+        <item name="android:dialogTheme">@style/Passport.Theme.Light.Dialog</item>
+        <item name="android:alertDialogTheme">@style/Passport.Theme.Light.Dialog.Alert</item>
+        <item name="android:alertDialogStyle">@style/Passport.AlertDialog</item>
+        <item name="android:alertDialogIcon">@null</item>
+
+        <item name="android:textColorPrimaryInverse">@color/passport_primary_text_dark</item>
+        <item name="android:textAppearanceLarge">@style/Passport.TextAppearance.Large</item>
+        <item name="android:textAppearanceMedium">@style/Passport.TextAppearance.Medium</item>
+        <item name="android:textAppearanceSmall">@style/Passport.TextAppearance.Small</item>
+        <item name="android:textAppearanceLargeInverse">@style/Passport.TextAppearance.Large.Inverse</item>
+        <item name="android:textAppearanceMediumInverse">@style/Passport.TextAppearance.Medium.Inverse</item>
+        <item name="android:textAppearanceSmallInverse">@style/Passport.TextAppearance.Small.Inverse</item>
+
+        <item name="android:progressBarStyle">@style/Passport.Widget.ProgressBar</item>
+
+        <item name="android:buttonStyle">@style/Passport.Widget.Button</item>
+        <item name="android:checkboxStyle">@style/Passport.Widget.CompoundButton.CheckBox</item>
+        <item name="android:buttonBarStyle">@style/Passport.Widget.ButtonBar</item>
+        <item name="android:buttonBarButtonStyle">@style/Passport.Widget.Button.Dialog</item>
+
+        <item name="android:editTextStyle">@style/Passport.Widget.EditText</item>
+        <item name="android:textCursorDrawable">@drawable/passport_text_cursor_light</item>
     </style>
 
 </resources>

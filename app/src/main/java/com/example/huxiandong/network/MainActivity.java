@@ -7,6 +7,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
+import com.example.huxiandong.network.api.ApiError;
 import com.example.huxiandong.network.api.ApiHelper;
 import com.example.huxiandong.network.api.ApiRequest;
 import com.example.huxiandong.network.api.LoginManager;
@@ -70,7 +71,7 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                     @Override
-                    public void onFailure(Throwable t) {
+                    public void onFailure(ApiError apiError) {
                     }
                 });
                 break;

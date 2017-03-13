@@ -11,7 +11,7 @@ import rx.Observable;
  * on 17-2-24.
  */
 
-public interface ApiProvider<T extends BaseResponse> {
+interface ApiProvider<T extends BaseResponse> {
 
     Observable<Response<T>> observable(DoubanService service);
 

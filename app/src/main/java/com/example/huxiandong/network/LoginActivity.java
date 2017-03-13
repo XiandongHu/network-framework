@@ -13,6 +13,7 @@ import com.example.huxiandong.network.api.LoginState;
 import com.xiaomi.accounts.Manifest;
 import com.xiaomi.passport.utils.RuntimePermissionActor;
 import com.xiaomi.passport.utils.RuntimePermissionHelper;
+import com.xiaomi.passport.widget.ProgressDialog;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
@@ -40,6 +41,11 @@ public class LoginActivity extends AppCompatActivity {
 
         setContentView(R.layout.activity_login);
         ButterKnife.bind(this);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
 
         refreshStatus();
         if (LoginManager.getInstance().hasSystemAccount()
@@ -97,11 +103,17 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void loginBySystemAccount() {
+        final ProgressDialog dialog = new ProgressDialog(this);
+        dialog.setMessage(getString(R.string.login_loading));
+        dialog.setCancelable(false);
+        dialog.show();
+
         LoginManager.getInstance().loginBySystemAccount(this)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(new Action1<LoginState>() {
                     @Override
                     public void call(LoginState loginState) {
+                        dialog.dismiss();
                         processLoginState(loginState);
                     }
                 });
@@ -120,11 +132,11 @@ public class LoginActivity extends AppCompatActivity {
 
     private void processLoginState(LoginState loginState) {
         if (loginState == LoginState.SUCCESS) {
-            Toast.makeText(LoginActivity.this, R.string.toast_login_success, Toast.LENGTH_SHORT).show();
+            Toast.makeText(LoginActivity.this, R.string.login_success, Toast.LENGTH_SHORT).show();
             setResult(RESULT_OK);
             finish();
         } else {
-            Toast.makeText(LoginActivity.this, R.string.toast_login_failed, Toast.LENGTH_SHORT).show();
+            Toast.makeText(LoginActivity.this, R.string.login_failed, Toast.LENGTH_SHORT).show();
         }
     }
 

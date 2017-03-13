@@ -8,6 +8,6 @@ package com.example.huxiandong.network.api.model;
 public class BaseResponse {
 
     public int code;
-    public String msg;
+    public String message;
 
 }

@@ -57,11 +57,12 @@ public class ApiManager {
         return sInstance;
     }
 
-    private Context mContext;
-    private Scheduler mDispatcherScheduler;
-    private DoubanService mDoubanService;
+    private final Context mContext;
+    private final ApiLogger mApiLogger;
 
-    private ApiLogger mApiLogger;
+    private final Scheduler mDispatcherScheduler;
+    private DoubanService mDoubanService;
+    private final LoginManager mLoginManager;
 
     private ApiManager(Context context, ApiLogger apiLogger) {
         mContext = context;
@@ -71,6 +72,7 @@ public class ApiManager {
         dispatcherThread.start();
         Looper looper = dispatcherThread.getLooper();
         mDispatcherScheduler = AndroidSchedulers.from(looper);
+        mLoginManager = LoginManager.init(mContext, mDispatcherScheduler, new Handler(looper), mApiLogger);
 
         Dispatcher dispatcher = new Dispatcher(new ThreadPoolExecutor(6, Integer.MAX_VALUE, 60, TimeUnit.SECONDS,
                 new LinkedBlockingQueue<Runnable>(), Util.threadFactory("OkHttp Dispatcher", false)));
@@ -80,9 +82,9 @@ public class ApiManager {
                 .readTimeout(10, TimeUnit.SECONDS)
                 .writeTimeout(5, TimeUnit.SECONDS)
                 .addInterceptor(new ParamsInterceptor())
-                .addNetworkInterceptor(new LoggingInterceptor(mApiLogger))
+                .addInterceptor(new LoggingInterceptor(mApiLogger, LoggingInterceptor.Level.BODY))
                 .addNetworkInterceptor(new DecryptInterceptor())
-                .cookieJar(LoginManager.init(mContext, mDispatcherScheduler, new Handler(looper), mApiLogger));
+                .cookieJar(mLoginManager);
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl("https://api.douban.com/v2/")
                 .client(builder.build())
@@ -93,14 +95,14 @@ public class ApiManager {
     }
 
     <T extends BaseResponse> ApiRequest<T> enqueue(final ApiProvider<T> provider, ApiRequest.Listener<T> listener) {
-        final ApiRequest<T> apiRequest = new ApiRequest<>(listener);
+        final ApiRequest<T> apiRequest = new ApiRequest<>(mLoginManager, listener);
         Observable.create(new Observable.OnSubscribe<Object>() {
             @Override
             public void call(Subscriber<? super Object> subscriber) {
                 try {
                     apiRequest.setObservable(provider.observable(mDoubanService));
                     if (!apiRequest.isCanceled()) {
-                        apiRequest.subscribe(mDispatcherScheduler);
+                        apiRequest.subscribe();
                     }
                 } catch (Throwable e) {
                     subscriber.onError(e);

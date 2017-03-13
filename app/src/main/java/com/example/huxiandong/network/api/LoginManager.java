@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import okhttp3.Cookie;
 import okhttp3.CookieJar;
@@ -31,6 +32,7 @@ import okhttp3.HttpUrl;
 import rx.Observable;
 import rx.Scheduler;
 import rx.Subscriber;
+import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.schedulers.Schedulers;
 
@@ -39,7 +41,7 @@ import rx.schedulers.Schedulers;
  * on 17/3/4.
  */
 
-public class LoginManager implements CookieJar {
+public class LoginManager implements CookieJar, ApiResponseHandler {
 
     @SuppressLint("StaticFieldLeak")
     private static LoginManager sInstance;
@@ -71,6 +73,28 @@ public class LoginManager implements CookieJar {
     private Set<CacheCookie> mCacheCookies = new HashSet<>();
     private final Object mCookieLock = new Object();
 
+    private List<ApiRequest> mPendingRequests = new ArrayList<>();
+    private final Object mRequestLock = new Object();
+
+    private enum State {
+        INITIALIZED,
+        VALID,
+        REFRESHING,
+        LOGIN_REQUIRED
+    }
+
+    private static class ServiceTokenStatus {
+        private State state;
+        private long lastRefreshTimeStamp;
+
+        private ServiceTokenStatus() {
+            state = State.INITIALIZED;
+            lastRefreshTimeStamp = 0L;
+        }
+    }
+
+    private final ServiceTokenStatus mServiceTokenStatus = new ServiceTokenStatus();
+
     private LoginManager(Context context, Scheduler scheduler, Handler handler, ApiLogger apiLogger) {
         mContext = context;
         mScheduler = scheduler;
@@ -90,6 +114,7 @@ public class LoginManager implements CookieJar {
         mAccountInfo = AccountInfo.load(mAccountManager, mAccountStore);
         if (mAccountInfo.isValid()) {
             addOrUpdateCookies(ApiConstants.MICO_SID);
+            updateServiceTokenStatus(ApiConstants.MICO_SID, State.VALID, 0L);
         }
     }
 
@@ -114,6 +139,13 @@ public class LoginManager implements CookieJar {
             cookies.add(cUserIdCookie);
             cookies.add(serviceTokenCookie);
             saveFromResponse(httpUrl, cookies);
+        }
+    }
+
+    private void updateServiceTokenStatus(String sid, State state, long lastRefreshTimeStamp) {
+        if (ApiConstants.MICO_SID.equals(sid)) {
+            mServiceTokenStatus.state = state;
+            mServiceTokenStatus.lastRefreshTimeStamp = lastRefreshTimeStamp;
         }
     }
 
@@ -146,6 +178,72 @@ public class LoginManager implements CookieJar {
                 mCacheCookies.remove(cacheCookie);
                 mCacheCookies.add(cacheCookie);
             }
+        }
+    }
+
+    @Override
+    public Scheduler getScheduler() {
+        return mScheduler;
+    }
+
+    @Override
+    public void retry(ApiRequest apiRequest) {
+        mApiLogger.d("Retry request.");
+        if (mServiceTokenStatus.state == State.VALID) {
+            long timeGap = Math.abs(System.currentTimeMillis() - mServiceTokenStatus.lastRefreshTimeStamp);
+            if (TimeUnit.MILLISECONDS.toSeconds(timeGap) > 20) {
+                synchronized (mRequestLock) {
+                    mPendingRequests.add(apiRequest);
+                }
+                mApiLogger.d("Refresh mico service token.");
+                updateServiceTokenStatus(ApiConstants.MICO_SID, State.REFRESHING, System.currentTimeMillis());
+                refreshServiceToken(ApiConstants.MICO_SID)
+                        .subscribe(new Action1<Boolean>() {
+                            @Override
+                            public void call(Boolean success) {
+                                if (success) {
+                                    mApiLogger.d("Refresh mico service token success.");
+                                    executePendingRequests();
+                                } else {
+                                    mApiLogger.d("Refresh mico service token failed.");
+                                    mServiceTokenStatus.state = State.LOGIN_REQUIRED;
+                                    updateServiceTokenStatus(ApiConstants.MICO_SID, State.LOGIN_REQUIRED, System.currentTimeMillis());
+                                }
+                            }
+                        });
+            } else {
+                executeRequest(apiRequest);
+            }
+        } else if (mServiceTokenStatus.state == State.REFRESHING) {
+            synchronized (mRequestLock) {
+                mPendingRequests.add(apiRequest);
+            }
+        } else {
+            apiRequest.error(ApiError.TOKEN_INSUFFICIENT);
+        }
+    }
+
+    @Override
+    public void cancel(ApiRequest apiRequest) {
+        synchronized (mRequestLock) {
+            mPendingRequests.remove(apiRequest);
+        }
+    }
+
+    private void executePendingRequests() {
+        synchronized (mRequestLock) {
+            Iterator it = mPendingRequests.iterator();
+            while (it.hasNext()) {
+                ApiRequest apiRequest = (ApiRequest) it.next();
+                executeRequest(apiRequest);
+                it.remove();
+            }
+        }
+    }
+
+    private void executeRequest(ApiRequest apiRequest) {
+        if (!apiRequest.isCanceled()) {
+            apiRequest.subscribe();
         }
     }
 
@@ -221,6 +319,7 @@ public class LoginManager implements CookieJar {
                             mAccountInfo.updateAccountCoreInfo(mAccountManager, mAccountStore,
                                     account, cUserId, authToken);
                             addOrUpdateCookies(sid);
+                            updateServiceTokenStatus(sid, State.VALID, System.currentTimeMillis());
                         } else {
                             state = LoginState.FAILED;
                         }
@@ -257,6 +356,7 @@ public class LoginManager implements CookieJar {
                                 mAccountInfo.updateAccountCoreInfo(mAccountManager, mAccountStore,
                                         account, cUserId, authToken);
                                 addOrUpdateCookies(sid);
+                                updateServiceTokenStatus(sid, State.VALID, System.currentTimeMillis());
                             } else {
                                 state = LoginState.FAILED;
                                 mApiLogger.w("Add account failed or canceled.");
@@ -283,9 +383,7 @@ public class LoginManager implements CookieJar {
 
                 ServiceTokenResult serviceTokenResult = mAccountManager.getServiceToken(mContext, sid).get();
                 if (serviceTokenResult.errorCode == ServiceTokenResult.ErrorCode.ERROR_NONE) {
-                    String authToken = ExtendedAuthToken.build(serviceTokenResult.serviceToken,
-                            serviceTokenResult.security).toPlain();
-                    mAccountManager.invalidateAuthToken(sid, authToken);
+                    mAccountManager.invalidateServiceToken(mContext, serviceTokenResult).get();
                 }
                 subscriber.onNext(mAccountManager.getServiceToken(mContext, sid).get());
                 subscriber.onCompleted();
@@ -300,6 +398,7 @@ public class LoginManager implements CookieJar {
                             mAccountInfo.updateServiceInfo(mAccountStore, sid, serviceTokenResult.serviceToken,
                                     serviceTokenResult.security);
                             addOrUpdateCookies(sid);
+                            updateServiceTokenStatus(sid, State.VALID, System.currentTimeMillis());
                             return true;
                         } else {
                             mApiLogger.e("Refresh service token failed: %s.", serviceTokenResult.errorMessage);
@@ -315,6 +414,7 @@ public class LoginManager implements CookieJar {
             public void call(final Subscriber<? super LoginState> subscriber) {
                 Account account = mAccountManager.getXiaomiAccount();
                 if (account == null) {
+                    onAccountRemoved();
                     subscriber.onNext(LoginState.NO_ACCOUNT);
                     subscriber.onCompleted();
                     return;
@@ -350,7 +450,8 @@ public class LoginManager implements CookieJar {
                     subscriber.onCompleted();
                 }
             }
-        });
+        })
+                .subscribeOn(mScheduler);
     }
 
     private void onAccountRemoved() {
@@ -358,6 +459,7 @@ public class LoginManager implements CookieJar {
         synchronized (mCookieLock) {
             mCacheCookies.clear();
         }
+        updateServiceTokenStatus(ApiConstants.MICO_SID, State.INITIALIZED, System.currentTimeMillis());
     }
 
 }
