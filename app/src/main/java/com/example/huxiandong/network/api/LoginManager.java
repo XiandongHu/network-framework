@@ -12,6 +12,7 @@ import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 
+import com.example.huxiandong.network.api.exception.NeedUserInteractionException;
 import com.example.huxiandong.network.api.logger.ApiLogger;
 import com.xiaomi.accountsdk.account.data.ExtendedAuthToken;
 import com.xiaomi.passport.accountmanager.MiAccountManager;
@@ -293,7 +294,14 @@ public class LoginManager implements CookieJar, ApiResponseHandler {
                     return;
                 }
 
-                subscriber.onNext(XMPassportInfo.build(activity, sid));
+                ServiceTokenResult serviceTokenResult = mAccountManager.getServiceToken(activity, sid).get();
+                if (serviceTokenResult.errorCode == ServiceTokenResult.ErrorCode.ERROR_USER_INTERACTION_NEEDED
+                        && serviceTokenResult.intent != null) {
+                    subscriber.onError(new NeedUserInteractionException(serviceTokenResult.intent));
+                    return;
+                }
+
+                subscriber.onNext(XMPassportInfo.build(mContext, sid));
                 subscriber.onCompleted();
             }
         })

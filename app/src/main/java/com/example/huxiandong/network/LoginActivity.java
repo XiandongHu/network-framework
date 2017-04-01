@@ -1,5 +1,6 @@
 package com.example.huxiandong.network;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
@@ -11,6 +12,7 @@ import android.widget.Toast;
 
 import com.example.huxiandong.network.api.LoginManager;
 import com.example.huxiandong.network.api.LoginState;
+import com.example.huxiandong.network.api.exception.NeedUserInteractionException;
 import com.xiaomi.passport.widget.ProgressDialog;
 
 import butterknife.BindView;
@@ -100,6 +102,12 @@ public class LoginActivity extends AppCompatActivity {
                         dialog.dismiss();
                         processLoginState(loginState);
                     }
+                }, new Action1<Throwable>() {
+                    @Override
+                    public void call(Throwable throwable) {
+                        dialog.dismiss();
+                        processLoginException(throwable);
+                    }
                 });
     }
 
@@ -119,6 +127,15 @@ public class LoginActivity extends AppCompatActivity {
             Toast.makeText(LoginActivity.this, R.string.login_success, Toast.LENGTH_SHORT).show();
             setResult(RESULT_OK);
             finish();
+        } else {
+            Toast.makeText(LoginActivity.this, R.string.login_failed, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void processLoginException(Throwable throwable) {
+        if (throwable instanceof NeedUserInteractionException) {
+            Intent intent = ((NeedUserInteractionException) throwable).getIntent();
+            startActivity(intent);
         } else {
             Toast.makeText(LoginActivity.this, R.string.login_failed, Toast.LENGTH_SHORT).show();
         }
