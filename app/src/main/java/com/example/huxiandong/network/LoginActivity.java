@@ -1,6 +1,7 @@
 package com.example.huxiandong.network;
 
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.text.TextUtils;
 import android.view.View;
@@ -10,9 +11,6 @@ import android.widget.Toast;
 
 import com.example.huxiandong.network.api.LoginManager;
 import com.example.huxiandong.network.api.LoginState;
-import com.xiaomi.accounts.Manifest;
-import com.xiaomi.passport.utils.RuntimePermissionActor;
-import com.xiaomi.passport.utils.RuntimePermissionHelper;
 import com.xiaomi.passport.widget.ProgressDialog;
 
 import butterknife.BindView;
@@ -35,22 +33,26 @@ public class LoginActivity extends AppCompatActivity {
     @BindView(R.id.button_local_login)
     Button mLocalLogin;
 
+    private AccountPermissionRequest mPermissionRequest;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_login);
         ButterKnife.bind(this);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
 
         refreshStatus();
         if (LoginManager.getInstance().hasSystemAccount()
-                && TextUtils.isEmpty(LoginManager.getInstance().getSystemAccountUserId()))
-            checkSystemDangerousPermission();
+                && TextUtils.isEmpty(LoginManager.getInstance().getSystemAccountUserId())) {
+            mPermissionRequest = new AccountPermissionRequest(this, new Runnable() {
+                @Override
+                public void run() {
+                    refreshStatus();
+                }
+            });
+            mPermissionRequest.checkAndRun();
+        }
     }
 
     @OnClick({R.id.button_system_login, R.id.button_local_login})
@@ -65,30 +67,12 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    private void checkSystemDangerousPermission() {
-        new RuntimePermissionHelper.Builder()
-                .runnableIfDenied(new Runnable() {
-                    @Override
-                    public void run() {
-                    }
-                })
-                .runnableIfGranted(new Runnable() {
-                    @Override
-                    public void run() {
-                        refreshStatus();
-                    }
-                })
-                .actor(new RuntimePermissionActor.Builder()
-                        .activity(LoginActivity.this)
-                        .requestCode(1)
-                        .requestedPermission(Manifest.permission.GET_ACCOUNTS)
-                        .explainDialogOkText(android.R.string.ok)
-                        .explainDialogCancelText(android.R.string.cancel)
-                        .explainDialogTitle(R.string.get_account_dialog_title)
-                        .explainDialogMessage(R.string.get_account_dialog_message)
-                        .build())
-                .build()
-                .checkAndRun();
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
+        if (mPermissionRequest != null) {
+            mPermissionRequest.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        }
     }
 
     private void refreshStatus() {

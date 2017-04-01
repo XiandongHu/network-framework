@@ -1,6 +1,7 @@
 package com.example.huxiandong.network.api;
 
 import android.accounts.Account;
+import android.accounts.AccountManager;
 import android.accounts.AccountManagerCallback;
 import android.accounts.AccountManagerFuture;
 import android.accounts.AuthenticatorException;
@@ -269,16 +270,10 @@ public class LoginManager implements CookieJar, ApiResponseHandler {
 
     public String getSystemAccountUserId() {
         if (hasSystemAccount()) {
-            boolean isUseSystem = mAccountManager.isUseSystem();
-            if (!isUseSystem) {
-                mAccountManager.setUseSystem();
-            }
-            Account account = mAccountManager.getXiaomiAccount();
-            if (account != null) {
-                return account.name;
-            }
-            if (!isUseSystem) {
-                mAccountManager.setUseLocal();
+            AccountManager am = AccountManager.get(mContext);
+            Account[] accounts = am.getAccountsByType(MiAccountManager.XIAOMI_ACCOUNT_TYPE);
+            if (accounts.length > 0) {
+                return accounts[0].name;
             }
         }
         return null;
