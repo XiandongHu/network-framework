@@ -11,6 +11,7 @@ import com.example.huxiandong.network.api.adapter.rxjava.RxJavaEnqueueCallAdapte
 import com.example.huxiandong.network.api.interceptor.DecryptInterceptor;
 import com.example.huxiandong.network.api.interceptor.LoggingInterceptor;
 import com.example.huxiandong.network.api.interceptor.ParamsInterceptor;
+import com.example.huxiandong.network.api.interceptor.UAInterceptor;
 import com.example.huxiandong.network.api.logger.AndroidLogger;
 import com.example.huxiandong.network.api.logger.ApiLogger;
 import com.example.huxiandong.network.api.model.BaseResponse;
@@ -81,6 +82,7 @@ public class ApiManager {
                 .connectTimeout(5, TimeUnit.SECONDS)
                 .readTimeout(10, TimeUnit.SECONDS)
                 .writeTimeout(5, TimeUnit.SECONDS)
+                .addInterceptor(new UAInterceptor())
                 .addInterceptor(new ParamsInterceptor())
                 .addInterceptor(new LoggingInterceptor(mApiLogger, LoggingInterceptor.Level.BODY))
                 .addNetworkInterceptor(new DecryptInterceptor())

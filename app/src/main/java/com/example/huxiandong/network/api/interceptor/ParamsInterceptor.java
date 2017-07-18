@@ -1,11 +1,13 @@
 package com.example.huxiandong.network.api.interceptor;
 
 import java.io.IOException;
+import java.util.Random;
 
 import okhttp3.FormBody;
 import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 
 /**
@@ -18,22 +20,37 @@ public class ParamsInterceptor implements Interceptor {
     @Override
     public Response intercept(Chain chain) throws IOException {
         Request request = chain.request();
-        Request.Builder requestBuilder = request.newBuilder()
-                .header("User-Agent", defaultUserAgent());
+        Request.Builder requestBuilder = request.newBuilder();
         if (request.method().equals("GET")) {
-            HttpUrl.Builder urlBuilder = request.url().newBuilder();
-            urlBuilder.addQueryParameter("deviceId", "xxx");
-            requestBuilder.url(urlBuilder.build());
-        } else if (request.method().equals("POST") && request.body() instanceof FormBody) {
-            // TODO: add form params
+            HttpUrl httpUrl = request.url().newBuilder()
+                    .addQueryParameter("requestId", randomRequestId())
+                    .build();
+            requestBuilder.url(httpUrl);
+        } else if (request.method().equals("POST")) {
+            RequestBody requestBody = request.body();
+            if (requestBody instanceof FormBody) {
+                FormBody.Builder formBodyBuilder = new FormBody.Builder();
+                FormBody formBody = (FormBody) requestBody;
+                for (int i = 0; i < formBody.size(); i++) {
+                    formBodyBuilder.addEncoded(formBody.encodedName(i), formBody.encodedValue(i));
+                }
+                formBody = formBodyBuilder.addEncoded("requestId", randomRequestId())
+                        .build();
+                requestBuilder.post(formBody);
+            }
         }
-
         return chain.proceed(requestBuilder.build());
     }
 
-    private String defaultUserAgent() {
-        String agent = System.getProperty("http.agent");
-        return agent != null ? agent : "Dalvik/2.1.0 (Linux; U; Android 5.0; SM-G9006V Build/LRX21T)";
+    private static String randomRequestId() {
+        String optionChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        Random random = new Random();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 20; i++) {
+            int index = random.nextInt(optionChars.length());
+            sb.append(optionChars.charAt(index));
+        }
+        return sb.toString();
     }
 
 }
